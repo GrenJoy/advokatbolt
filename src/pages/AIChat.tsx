@@ -1,12 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   Send, 
   Bot, 
   User, 
   Paperclip, 
-  Search,
-  Clock,
-  MessageCircle,
   FileText,
   Brain,
   Zap
@@ -79,10 +76,80 @@ const suggestedQuestions = [
 ]
 
 export default function AIChat() {
-  const [selectedChat, setSelectedChat] = useState(mockChats[0])
-  const [messages, setMessages] = useState<Message[]>(mockMessages)
+  const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(() => 
+    localStorage.getItem('chatSessionId')
+  )
+  const [totalTokens, setTotalTokens] = useState(0)
+
+  // Сохранение sessionId в localStorage
+  useEffect(() => {
+    if (sessionId) {
+      localStorage.setItem('chatSessionId', sessionId)
+    }
+  }, [sessionId])
+
+  // Загрузка истории чата при инициализации
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const url = sessionId 
+          ? `/api/chat/history?sessionId=${sessionId}`
+          : '/api/chat/history'
+          
+        const response = await fetch(url)
+        
+        if (response.ok) {
+          const data = await response.json()
+          
+          if (data.messages && data.messages.length > 0) {
+            const formattedMessages = data.messages.map((msg: any) => ({
+              id: msg.id,
+              content: msg.content,
+              isUser: msg.role === 'user',
+              timestamp: new Date(msg.timestamp).toLocaleString('ru-RU'),
+              context: msg.role === 'assistant' ? 'Ответ от Gemini Flash' : undefined
+            }))
+            setMessages(formattedMessages)
+          }
+          
+          if (data.sessionId && data.sessionId !== sessionId) {
+            setSessionId(data.sessionId)
+          }
+          
+          setTotalTokens(data.totalTokens || 0)
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки истории:', error)
+      }
+    }
+
+    loadChatHistory()
+  }, [sessionId])
+
+  // Очистка истории чата
+  const clearChatHistory = async () => {
+    try {
+      const response = await fetch('/api/chat/clear', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sessionId: sessionId }),
+      })
+
+      if (response.ok) {
+        setMessages([])
+        setSessionId(null)
+        localStorage.removeItem('chatSessionId')
+        setTotalTokens(0)
+      }
+    } catch (error) {
+      console.error('Ошибка очистки истории:', error)
+    }
+  }
 
   const sendMessage = async () => {
     if (!inputMessage.trim()) return
@@ -98,18 +165,54 @@ export default function AIChat() {
     setInputMessage('')
     setIsLoading(true)
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Реальный запрос к Gemini API с sessionId
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: inputMessage.trim(),
+          sessionId: sessionId
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Ошибка при отправке сообщения')
+      }
+
+      const result = await response.json()
+      
+      // Обновляем sessionId если он изменился
+      if (result.sessionId && result.sessionId !== sessionId) {
+        setSessionId(result.sessionId)
+      }
+      
       const aiResponse: Message = {
+        id: result.message.id,
+        content: result.message.content,
+        isUser: false,
+        timestamp: new Date(result.message.timestamp).toLocaleString('ru-RU'),
+        context: `Ответ от Gemini 2.5 Flash • Токенов: ${result.totalTokens}`
+      }
+      
+      setMessages(prev => [...prev, aiResponse])
+      setTotalTokens(result.totalTokens)
+    } catch (error) {
+      console.error('Ошибка чата:', error)
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: 'Анализирую ваш запрос и документы дела... Это демо-версия ИИ ассистента. В реальной версии здесь будет ответ от Gemini Pro 2.5 на основе всех документов дела.',
+        content: 'Извините, произошла ошибка при обращении к AI. Попробуйте еще раз.',
         isUser: false,
         timestamp: new Date().toLocaleString('ru-RU'),
-        context: `Проанализированы документы дела ${selectedChat.caseNumber}`
+        context: 'Ошибка системы'
       }
-      setMessages(prev => [...prev, aiResponse])
+      setMessages(prev => [...prev, errorMessage])
+    } finally {
       setIsLoading(false)
-    }, 2000)
+    }
   }
 
   const handleSuggestedQuestion = (question: string) => {
@@ -118,73 +221,32 @@ export default function AIChat() {
 
   return (
     <div className="p-6 h-full">
-      <div className="flex h-full gap-6">
-        {/* Chat List Sidebar */}
-        <div className="w-80 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
-          <div className="p-6 border-b border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">ИИ Чаты по делам</h2>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Поиск чатов..."
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {mockChats.map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => setSelectedChat(chat)}
-                className={`p-4 border-b border-slate-100 cursor-pointer transition-colors ${
-                  selectedChat.id === chat.id ? 'bg-blue-50' : 'hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-slate-900 truncate">{chat.caseTitle}</h3>
-                    <p className="text-xs text-slate-500 mb-1">{chat.caseNumber}</p>
-                    <p className="text-sm text-slate-600 truncate">{chat.lastMessage}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="flex items-center gap-1 text-xs text-slate-500">
-                        <Clock className="w-3 h-3" />
-                        {chat.timestamp}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-slate-500">
-                        <MessageCircle className="w-3 h-3" />
-                        {chat.messageCount}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
+      <div className="h-full">
         {/* Main Chat Area */}
-        <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-full">
           {/* Chat Header */}
           <div className="p-6 border-b border-slate-200">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-semibold text-slate-900">{selectedChat.caseTitle}</h1>
-                <p className="text-slate-600">{selectedChat.caseNumber} • ИИ-ассистент с полным контекстом дела</p>
+                <h1 className="text-xl font-semibold text-slate-900">AI Помощник</h1>
+                <p className="text-slate-600">Юридический ИИ-ассистент с полным контекстом</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm">
                   <Brain className="w-4 h-4" />
-                  Gemini Pro 2.5
+                  Gemini Flash
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm">
                   <FileText className="w-4 h-4" />
-                  12 документов
+                  Токенов: {totalTokens}
                 </div>
+                <button
+                  onClick={clearChatHistory}
+                  className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded-full text-sm transition-colors"
+                  title="Очистить историю чата"
+                >
+                  Очистить
+                </button>
               </div>
             </div>
           </div>

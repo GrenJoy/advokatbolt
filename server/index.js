@@ -45,7 +45,7 @@ const ocrModel = genAI.getGenerativeModel({
 })
 
 const chatModel = genAI.getGenerativeModel({ 
-  model: 'gemini-1.5-flash',
+  model: 'gemini-2.0-flash-exp',
   generationConfig: {
     temperature: 0.7,
     topP: 0.9,
@@ -146,36 +146,159 @@ app.post('/api/ocr', upload.single('document'), async (req, res) => {
   }
 })
 
-// API роут для AI чата
+// Хранилище истории чатов по сессиям (в памяти)
+const chatSessions = new Map() // sessionId -> { messages: [], lastActivity: Date }
+const SESSION_TIMEOUT = 24 * 60 * 60 * 1000 // 24 часа
+const MAX_MESSAGES_PER_SESSION = 100 // Лимит сообщений на сессию
+
+// Генерация ID сессии
+function generateSessionId() {
+  return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+}
+
+// Очистка старых сессий
+function cleanupOldSessions() {
+  const now = Date.now()
+  for (const [sessionId, session] of chatSessions.entries()) {
+    if (now - session.lastActivity > SESSION_TIMEOUT) {
+      chatSessions.delete(sessionId)
+    }
+  }
+}
+
+// Получение или создание сессии
+function getOrCreateSession(sessionId) {
+  if (!sessionId || !chatSessions.has(sessionId)) {
+    const newSessionId = generateSessionId()
+    chatSessions.set(newSessionId, {
+      messages: [],
+      lastActivity: Date.now()
+    })
+    return newSessionId
+  }
+  
+  const session = chatSessions.get(sessionId)
+  session.lastActivity = Date.now()
+  return sessionId
+}
+
+// API роут для AI чата с историей по сессиям
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, context } = req.body
-
-    if (!message) {
+    const { message, sessionId } = req.body
+    
+    if (!message || message.trim().length === 0) {
       return res.status(400).json({ error: 'Сообщение не может быть пустым' })
     }
 
-    let prompt = message
-    
-    if (context) {
-      prompt = `Контекст: ${context}\n\nВопрос: ${message}\n\nОтветьте как опытный российский юрист, учитывая российское законодательство.`
+    // Очистка старых сессий
+    cleanupOldSessions()
+
+    // Получаем или создаем сессию
+    const currentSessionId = getOrCreateSession(sessionId)
+    const session = chatSessions.get(currentSessionId)
+
+    // Проверяем лимит сообщений
+    if (session.messages.length >= MAX_MESSAGES_PER_SESSION) {
+      return res.status(429).json({ 
+        error: 'Достигнут лимит сообщений для этой сессии. Начните новый чат.' 
+      })
     }
+
+    // Добавляем пользовательское сообщение
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: message.trim(),
+      timestamp: new Date().toISOString()
+    }
+    session.messages.push(userMessage)
+
+    // Подготавливаем контекст для Gemini (последние 10 сообщений)
+    const recentMessages = session.messages.slice(-10)
+    
+    const prompt = `Ты - AI помощник для российского юриста. Отвечай кратко, профессионально и по делу на русском языке.
+    
+История разговора:
+${recentMessages.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${msg.content}`).join('\n')}
+
+Последний вопрос: ${message}
+
+Ответь максимально полезно с учетом российского законодательства. Если нужна дополнительная информация, попроси её.`
 
     const result = await chatModel.generateContent(prompt)
     const response = await result.response
-    const aiResponse = response.text()
+    const assistantMessage = response.text()
+
+    // Добавляем ответ ассистента
+    const aiMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: assistantMessage,
+      timestamp: new Date().toISOString()
+    }
+    session.messages.push(aiMessage)
 
     res.json({
-      success: true,
-      response: aiResponse
+      message: aiMessage,
+      sessionId: currentSessionId,
+      totalTokens: session.messages.length * 50 // Примерная оценка токенов
     })
 
   } catch (error) {
-    console.error('Ошибка при обращении к AI:', error)
+    console.error('Ошибка в чате:', error)
     res.status(500).json({ 
-      success: false, 
-      error: 'Не удалось получить ответ от AI. Попробуйте позже.' 
+      error: 'Ошибка при обработке запроса к AI',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
+  }
+})
+
+// API для получения истории чата по сессии
+app.get('/api/chat/history', (req, res) => {
+  try {
+    const { sessionId } = req.query
+
+    cleanupOldSessions()
+
+    if (!sessionId || !chatSessions.has(sessionId)) {
+      return res.json({
+        messages: [],
+        sessionId: null,
+        totalTokens: 0
+      })
+    }
+
+    const session = chatSessions.get(sessionId)
+    session.lastActivity = Date.now()
+
+    res.json({
+      messages: session.messages.map(msg => ({
+        ...msg,
+        timestamp: new Date(msg.timestamp)
+      })),
+      sessionId: sessionId,
+      totalTokens: session.messages.length * 50
+    })
+  } catch (error) {
+    console.error('Ошибка получения истории:', error)
+    res.status(500).json({ error: 'Ошибка получения истории чата' })
+  }
+})
+
+// API для очистки истории чата по сессии
+app.delete('/api/chat/clear', (req, res) => {
+  try {
+    const { sessionId } = req.body
+
+    if (sessionId && chatSessions.has(sessionId)) {
+      chatSessions.delete(sessionId)
+    }
+
+    res.json({ success: true, message: 'История чата очищена' })
+  } catch (error) {
+    console.error('Ошибка очистки истории:', error)
+    res.status(500).json({ error: 'Ошибка очистки истории чата' })
   }
 })
 
