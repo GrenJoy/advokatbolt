@@ -36,9 +36,12 @@ export interface Case {
 export interface CaseDocument {
   id: string;
   case_id: string;
+  file_name: string;
   original_name: string;
   file_path: string;
+  file_size: number;
   file_type: string;
+  document_type: string;
   transcription?: string;
   extracted_dates?: string[];
   extracted_numbers?: string[];

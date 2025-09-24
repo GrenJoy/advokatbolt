@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { 
   Plus, 
   Search, 
@@ -11,11 +12,14 @@ import {
   AlertCircle,
   Edit,
   Trash2,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react'
 import { Case } from '../types'
 import { useCases, useDeleteCase } from '../hooks/useCases'
 import { CaseForm } from '../components/CaseForm'
+import { DocumentUpload } from '../components/DocumentUpload'
+import { DocumentsList } from '../components/DocumentsList'
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -187,9 +191,13 @@ export default function Cases() {
               <div className="flex-1">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900 mb-1" data-testid={`text-case-title-${case_item.id}`}>
+                    <Link 
+                      to={`/cases/${case_item.id}`}
+                      className="text-lg font-semibold text-slate-900 mb-1 hover:text-blue-600 transition-colors"
+                      data-testid={`text-case-title-${case_item.id}`}
+                    >
                       {case_item.title}
-                    </h3>
+                    </Link>
                     <p className="text-sm text-slate-600 mb-2">{case_item.description}</p>
                     <div className="flex items-center gap-4 text-sm text-slate-500">
                       <div className="flex items-center gap-1">
@@ -215,10 +223,18 @@ export default function Cases() {
                       <MoreVertical className="w-5 h-5" />
                     </button>
                     {showDeleteMenu === case_item.id && (
-                      <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                      <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[160px]">
+                        <Link
+                          to={`/cases/${case_item.id}`}
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg flex items-center gap-2"
+                          data-testid={`button-view-case-${case_item.id}`}
+                        >
+                          <Eye className="w-4 h-4" />
+                          Просмотреть
+                        </Link>
                         <button
                           onClick={() => handleEditCase(case_item)}
-                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                           data-testid={`button-edit-case-${case_item.id}`}
                         >
                           <Edit className="w-4 h-4" />
