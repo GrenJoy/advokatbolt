@@ -7,6 +7,7 @@ export interface User {
 
 export interface Client {
   id: string;
+  lawyer_id: string;
   name: string;
   email: string;
   phone: string;
@@ -17,14 +18,15 @@ export interface Client {
 
 export interface Case {
   id: string;
-  case_number: string;
+  lawyer_id: string;
+  case_number?: string;
   title: string;
   description: string;
   status: 'active' | 'paused' | 'completed' | 'archived';
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  client_id: string;
+  client_id?: string;
   client?: Client;
-  case_type: string;
+  case_type?: string;
   court_instance?: string;
   opposing_party?: string;
   internal_notes?: string;

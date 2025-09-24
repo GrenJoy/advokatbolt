@@ -73,8 +73,8 @@ export default function Cases() {
   
   const filteredCases = cases.filter(case_item => {
     const matchesSearch = case_item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         case_item.case_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         case_item.client?.name.toLowerCase().includes(searchQuery.toLowerCase())
+                         (case_item.case_number && case_item.case_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                         (case_item.client?.name && case_item.client.name.toLowerCase().includes(searchQuery.toLowerCase()))
     
     const matchesStatus = selectedStatus === 'all' || case_item.status === selectedStatus
     
@@ -200,14 +200,18 @@ export default function Cases() {
                     </Link>
                     <p className="text-sm text-slate-600 mb-2">{case_item.description}</p>
                     <div className="flex items-center gap-4 text-sm text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <Briefcase className="w-4 h-4" />
-                        {case_item.case_number}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <User className="w-4 h-4" />
-                        {case_item.client?.name}
-                      </div>
+                      {case_item.case_number && (
+                        <div className="flex items-center gap-1">
+                          <Briefcase className="w-4 h-4" />
+                          {case_item.case_number}
+                        </div>
+                      )}
+                      {case_item.client?.name && (
+                        <div className="flex items-center gap-1">
+                          <User className="w-4 h-4" />
+                          {case_item.client.name}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         {new Date(case_item.updated_at).toLocaleDateString('ru-RU')}
@@ -261,9 +265,11 @@ export default function Cases() {
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(case_item.priority)}`}>
                       {getPriorityText(case_item.priority)}
                     </span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                      {case_item.case_type}
-                    </span>
+                    {case_item.case_type && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        {case_item.case_type}
+                      </span>
+                    )}
                   </div>
                   
                   <div className="flex items-center gap-2">

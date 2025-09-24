@@ -82,7 +82,9 @@ export default function CaseDetails() {
             <h1 className="text-2xl font-bold text-slate-900" data-testid="text-case-title">
               {currentCase.title}
             </h1>
-            <p className="text-slate-600">{currentCase.case_number}</p>
+            {currentCase.case_number && (
+              <p className="text-slate-600">{currentCase.case_number}</p>
+            )}
           </div>
         </div>
         
@@ -160,13 +162,15 @@ export default function CaseDetails() {
                 <p className="text-slate-600">{currentCase.description}</p>
               </div>
               
-              <div>
-                <h3 className="text-sm font-medium text-slate-700 mb-2">Клиент</h3>
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-600">{currentCase.client?.name}</span>
+              {currentCase.client?.name && (
+                <div>
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Клиент</h3>
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">{currentCase.client.name}</span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <h3 className="text-sm font-medium text-slate-700 mb-2">Статус и приоритет</h3>
@@ -201,12 +205,14 @@ export default function CaseDetails() {
                 </div>
               )}
 
-              <div>
-                <h3 className="text-sm font-medium text-slate-700 mb-2">Тип дела</h3>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  {currentCase.case_type}
-                </span>
-              </div>
+              {currentCase.case_type && (
+                <div>
+                  <h3 className="text-sm font-medium text-slate-700 mb-2">Тип дела</h3>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    {currentCase.case_type}
+                  </span>
+                </div>
+              )}
             </div>
 
             {currentCase.tags.length > 0 && (

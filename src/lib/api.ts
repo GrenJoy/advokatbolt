@@ -15,10 +15,10 @@ export const clientsApi = {
   },
 
   // Создать клиента
-  async create(client: Omit<Client, 'id' | 'created_at' | 'updated_at'>): Promise<Client> {
+  async create(client: Omit<Client, 'id' | 'created_at' | 'updated_at' | 'lawyer_id'>): Promise<Client> {
     const { data, error } = await supabase
       .from('clients')
-      .insert([client])
+      .insert([{ ...client, lawyer_id: '00000000-0000-0000-0000-000000000000' }])
       .select('*')
       .single()
     
@@ -82,10 +82,22 @@ export const casesApi = {
   },
 
   // Создать дело
-  async create(caseData: Omit<Case, 'id' | 'created_at' | 'updated_at' | 'client'>): Promise<Case> {
+  async create(caseData: Omit<Case, 'id' | 'created_at' | 'updated_at' | 'client' | 'lawyer_id'>): Promise<Case> {
+    // Очищаем пустые строки до null для необязательных полей
+    const cleanedData = {
+      ...caseData,
+      lawyer_id: '00000000-0000-0000-0000-000000000000',
+      case_number: caseData.case_number || null,
+      client_id: caseData.client_id || null,
+      case_type: caseData.case_type || 'Не указан', // Делаем значение по умолчанию
+      court_instance: caseData.court_instance || null,
+      opposing_party: caseData.opposing_party || null,
+      internal_notes: caseData.internal_notes || null,
+    }
+
     const { data, error } = await supabase
       .from('cases')
-      .insert([caseData])
+      .insert([cleanedData])
       .select(`
         *,
         client:clients(*)
@@ -98,9 +110,20 @@ export const casesApi = {
 
   // Обновить дело
   async update(id: string, updates: Partial<Case>): Promise<Case> {
+    // Очищаем пустые строки до null для необязательных полей
+    const cleanedUpdates = {
+      ...updates,
+      case_number: updates.case_number || null,
+      client_id: updates.client_id || null,
+      case_type: updates.case_type || null,
+      court_instance: updates.court_instance || null,
+      opposing_party: updates.opposing_party || null,
+      internal_notes: updates.internal_notes || null,
+    }
+
     const { data, error } = await supabase
       .from('cases')
-      .update(updates)
+      .update(cleanedUpdates)
       .eq('id', id)
       .select(`
         *,

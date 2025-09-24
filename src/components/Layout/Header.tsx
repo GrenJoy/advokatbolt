@@ -1,9 +1,7 @@
-// import React from 'react'
+import React from 'react'
 import { Search, Bell, User, LogOut } from 'lucide-react'
-import { useAuthStore } from '../../stores/authStore'
 
 export default function Header() {
-  const { user } = useAuthStore()
 
   return (
     <header className="bg-white border-b border-slate-200 px-6 py-4">
@@ -33,8 +31,8 @@ export default function Header() {
               <User className="w-4 h-4 text-white" />
             </div>
             <div className="hidden sm:block">
-              <p className="text-sm font-medium text-slate-900">{user?.name || 'Адвокат'}</p>
-              <p className="text-xs text-slate-500">{user?.email}</p>
+              <p className="text-sm font-medium text-slate-900">Адвокат</p>
+              <p className="text-xs text-slate-500">test@lawyer.com</p>
             </div>
           </div>
           

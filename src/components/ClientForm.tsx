@@ -21,6 +21,7 @@ export function ClientForm({ client, isOpen, onClose }: ClientFormProps) {
   const createClient = useCreateClient()
   const updateClient = useUpdateClient()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const {
     register,
@@ -57,6 +58,7 @@ export function ClientForm({ client, isOpen, onClose }: ClientFormProps) {
 
   const onSubmit = async (data: ClientFormData) => {
     setIsSubmitting(true)
+    setError(null)
     try {
       if (client) {
         await updateClient.mutateAsync({ id: client.id, updates: data })
@@ -65,8 +67,9 @@ export function ClientForm({ client, isOpen, onClose }: ClientFormProps) {
       }
       reset()
       onClose()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при сохранении клиента:', error)
+      setError(error?.message || 'Произошла ошибка при сохранении клиента')
     } finally {
       setIsSubmitting(false)
     }
@@ -91,6 +94,11 @@ export function ClientForm({ client, isOpen, onClose }: ClientFormProps) {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               <User className="w-4 h-4 inline mr-1" />

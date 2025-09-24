@@ -31,6 +31,7 @@ export function CaseForm({ case: caseData, isOpen, onClose }: CaseFormProps) {
   const { data: clients = [] } = useClients()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [tagsInput, setTagsInput] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   const {
     register,
@@ -101,6 +102,7 @@ export function CaseForm({ case: caseData, isOpen, onClose }: CaseFormProps) {
 
   const onSubmit = async (data: CaseFormData) => {
     setIsSubmitting(true)
+    setError(null)
     try {
       if (caseData) {
         await updateCase.mutateAsync({ id: caseData.id, updates: data })
@@ -110,8 +112,9 @@ export function CaseForm({ case: caseData, isOpen, onClose }: CaseFormProps) {
       reset()
       setTagsInput('')
       onClose()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при сохранении дела:', error)
+      setError(error?.message || 'Произошла ошибка при сохранении дела')
     } finally {
       setIsSubmitting(false)
     }
@@ -136,44 +139,43 @@ export function CaseForm({ case: caseData, isOpen, onClose }: CaseFormProps) {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 <Briefcase className="w-4 h-4 inline mr-1" />
-                Номер дела *
+                Номер дела
               </label>
               <input
                 type="text"
-                {...register('case_number', { required: 'Номер дела обязателен' })}
+                {...register('case_number')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="A40-123456/2024"
+                placeholder="A40-123456/2024 (можно заполнить позже)"
                 data-testid="input-case-number"
               />
-              {errors.case_number && (
-                <p className="text-red-500 text-sm mt-1">{errors.case_number.message}</p>
-              )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 <User className="w-4 h-4 inline mr-1" />
-                Клиент *
+                Клиент
               </label>
               <select
-                {...register('client_id', { required: 'Клиент обязателен' })}
+                {...register('client_id')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 data-testid="select-client"
               >
-                <option value="">Выберите клиента</option>
+                <option value="">Выберите клиента (можно добавить позже)</option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.name}
                   </option>
                 ))}
               </select>
-              {errors.client_id && (
-                <p className="text-red-500 text-sm mt-1">{errors.client_id.message}</p>
-              )}
             </div>
           </div>
 
@@ -246,18 +248,15 @@ export function CaseForm({ case: caseData, isOpen, onClose }: CaseFormProps) {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 <Scale className="w-4 h-4 inline mr-1" />
-                Тип дела *
+                Тип дела
               </label>
               <input
                 type="text"
-                {...register('case_type', { required: 'Тип дела обязателен' })}
+                {...register('case_type')}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Трудовое право"
+                placeholder="Трудовое право (можно заполнить позже)"
                 data-testid="input-case-type"
               />
-              {errors.case_type && (
-                <p className="text-red-500 text-sm mt-1">{errors.case_type.message}</p>
-              )}
             </div>
           </div>
 
