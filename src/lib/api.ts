@@ -306,3 +306,48 @@ export const chatApi = {
     return data.response
   }
 }
+
+// Общий AI-чат, привязанный к клиенту (использует таблицу general_ai_chats)
+export const generalChatApi = {
+  // Сохранить сообщение и ответ AI в одной записи
+  async appendMessage(sessionId: string, userMessage: string, aiResponse: string, attachments: any[] = [], searchMode = false) {
+    const { data, error } = await supabase
+      .from('general_ai_chats')
+      .insert([
+        {
+          session_id: sessionId,
+          user_message: userMessage,
+          ai_response: aiResponse,
+          attachments,
+          search_mode: searchMode
+        }
+      ])
+      .select('*')
+      .single()
+
+    if (error) throw error
+    return data
+  },
+
+  // Получить историю по sessionId (текстовый)
+  async getHistory(sessionId: string) {
+    const { data, error } = await supabase
+      .from('general_ai_chats')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+    return data || []
+  },
+
+  // Очистить историю по sessionId
+  async clear(sessionId: string) {
+    const { error } = await supabase
+      .from('general_ai_chats')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (error) throw error
+  }
+}

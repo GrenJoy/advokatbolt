@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Send, Trash2 } from 'lucide-react'
 import { useAIContext } from '../hooks/useAIContext'
+import { generalChatApi } from '../lib/api'
 
 interface Props {
   clientId: string
@@ -68,6 +69,9 @@ export default function ClientAIChat({ clientId }: Props) {
         timestamp: new Date(json.message.timestamp).toLocaleString('ru-RU')
       }
       setMessages((prev: UIMessage[]) => [...prev, aiMsg])
+      // сохраняем в Supabase в general_ai_chats
+      const sid = json.sessionId || sessionId || `client_${clientId}`
+      await generalChatApi.appendMessage(sid, uiMsg.content, aiMsg.content)
       setInput('')
     } catch (e) {
       console.error(e)
@@ -82,6 +86,9 @@ export default function ClientAIChat({ clientId }: Props) {
       await clearContextCache(clientId)
       // очистка сессионной истории чата в памяти API
       await fetch('/api/chat/clear', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) })
+      if (sessionId) {
+        await generalChatApi.clear(sessionId)
+      }
       setMessages([])
       setSessionId(null)
     } catch (e) {
