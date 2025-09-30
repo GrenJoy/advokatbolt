@@ -3,12 +3,17 @@ import { documentsApi } from '../lib/api'
 import { processDocumentOCR } from '../lib/gemini'
 import type { CaseDocument } from '../types'
 
-// Получить документы дела
-export function useDocuments(caseId: string) {
+// Получить документы дела или клиента
+export function useDocuments(entityId: string, entityType: 'case' | 'client' = 'case') {
   return useQuery({
-    queryKey: ['/api/documents', caseId],
-    queryFn: () => documentsApi.getByCaseId(caseId),
-    enabled: !!caseId
+    queryKey: ['/api/documents', entityId, entityType],
+    queryFn: () => {
+      if (entityType === 'client') {
+        return documentsApi.getByClientId(entityId)
+      }
+      return documentsApi.getByCaseId(entityId)
+    },
+    enabled: !!entityId
   })
 }
 
@@ -84,19 +89,21 @@ export function useDeleteDocument() {
     mutationFn: async ({ 
       documentId, 
       filePath, 
-      caseId 
+      entityId,
+      entityType = 'case' 
     }: { 
       documentId: string
       filePath: string
-      caseId: string 
+      entityId: string
+      entityType?: 'case' | 'client'
     }) => {
       await documentsApi.delete(documentId, filePath)
-      return { documentId, caseId }
+      return { documentId, entityId, entityType }
     },
     onSuccess: (data) => {
       // Обновить кеш документов
       queryClient.invalidateQueries({ 
-        queryKey: ['/api/documents', data.caseId] 
+        queryKey: ['/api/documents', data.entityId, data.entityType] 
       })
     }
   })

@@ -148,6 +148,7 @@ app.post('/api/ocr', upload.single('document'), async (req, res) => {
 
 // Хранилище истории чатов по сессиям (в памяти)
 const chatSessions = new Map() // sessionId -> { messages: [], lastActivity: Date }
+const clientChatSessions = new Map() // clientId -> Map(sessionId -> { messages: [], lastActivity: Date })
 const SESSION_TIMEOUT = 24 * 60 * 60 * 1000 // 24 часа
 const MAX_MESSAGES_PER_SESSION = 100 // Лимит сообщений на сессию
 
@@ -298,6 +299,189 @@ app.delete('/api/chat/clear', (req, res) => {
     res.json({ success: true, message: 'История чата очищена' })
   } catch (error) {
     console.error('Ошибка очистки истории:', error)
+    res.status(500).json({ error: 'Ошибка очистки истории чата' })
+  }
+})
+
+// ========== CLIENT AI CHAT ENDPOINTS ==========
+
+// Получение или создание сессии для клиента
+function getOrCreateClientSession(clientId, sessionId) {
+  if (!clientChatSessions.has(clientId)) {
+    clientChatSessions.set(clientId, new Map())
+  }
+  
+  const clientSessions = clientChatSessions.get(clientId)
+  
+  if (!sessionId || !clientSessions.has(sessionId)) {
+    const newSessionId = generateSessionId()
+    clientSessions.set(newSessionId, {
+      messages: [],
+      lastActivity: Date.now()
+    })
+    return newSessionId
+  }
+  
+  const session = clientSessions.get(sessionId)
+  session.lastActivity = Date.now()
+  return sessionId
+}
+
+// API для AI чата с контекстом клиента
+app.post('/api/chat/client', async (req, res) => {
+  try {
+    const { message, clientId, sessionId, contextCacheId } = req.body
+    
+    if (!message || message.trim().length === 0) {
+      return res.status(400).json({ error: 'Сообщение не может быть пустым' })
+    }
+    
+    if (!clientId) {
+      return res.status(400).json({ error: 'ID клиента обязателен' })
+    }
+
+    // Получаем или создаем сессию
+    const currentSessionId = getOrCreateClientSession(clientId, sessionId)
+    const clientSessions = clientChatSessions.get(clientId)
+    const session = clientSessions.get(currentSessionId)
+
+    // Проверяем лимит сообщений
+    if (session.messages.length >= MAX_MESSAGES_PER_SESSION) {
+      return res.status(429).json({ 
+        error: 'Достигнут лимит сообщений для этой сессии. Начните новый чат.' 
+      })
+    }
+
+    // Добавляем пользовательское сообщение
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: message.trim(),
+      timestamp: new Date().toISOString()
+    }
+    session.messages.push(userMessage)
+
+    // Подготавливаем контекст для Gemini
+    const recentMessages = session.messages.slice(-10)
+    
+    // Базовый промпт с контекстом клиента
+    let contextInfo = ''
+    if (contextCacheId) {
+      contextInfo = `
+ВАЖНО: У тебя есть доступ к контексту клиента. Используй эту информацию для более персонализированных и точных ответов.
+Контекст может включать: информацию о клиенте, документы с OCR, связанные дела, заметки.
+`
+    }
+    
+    const prompt = `Ты - AI помощник для российского юриста, работающий с конкретным клиентом. 
+Отвечай кратко, профессионально и по делу на русском языке.
+${contextInfo}
+    
+История разговора:
+${recentMessages.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${msg.content}`).join('\n')}
+
+Последний вопрос: ${message}
+
+Отвечай с учетом российского законодательства. Если нужна дополнительная информация, попроси её.`
+
+    const result = await chatModel.generateContent(prompt)
+    const response = await result.response
+    const assistantMessage = response.text()
+
+    // Добавляем ответ ассистента
+    const aiMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'assistant',
+      content: assistantMessage,
+      timestamp: new Date().toISOString()
+    }
+    session.messages.push(aiMessage)
+
+    res.json({
+      message: aiMessage,
+      sessionId: currentSessionId,
+      totalTokens: session.messages.length * 50 // Примерная оценка токенов
+    })
+
+  } catch (error) {
+    console.error('Ошибка в чате клиента:', error)
+    res.status(500).json({ 
+      error: 'Ошибка при обработке запроса к AI',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+})
+
+// API для получения истории чата клиента
+app.get('/api/chat/client/:clientId/history', (req, res) => {
+  try {
+    const { clientId } = req.params
+    const { sessionId } = req.query
+
+    if (!clientChatSessions.has(clientId)) {
+      return res.json({
+        messages: [],
+        sessionId: null,
+        totalTokens: 0
+      })
+    }
+
+    const clientSessions = clientChatSessions.get(clientId)
+    
+    // Если указан sessionId, возвращаем конкретную сессию
+    if (sessionId && clientSessions.has(sessionId)) {
+      const session = clientSessions.get(sessionId)
+      session.lastActivity = Date.now()
+      
+      return res.json({
+        messages: session.messages,
+        sessionId: sessionId,
+        totalTokens: session.messages.length * 50
+      })
+    }
+    
+    // Иначе возвращаем последнюю активную сессию
+    let latestSession = null
+    let latestSessionId = null
+    
+    for (const [sid, session] of clientSessions.entries()) {
+      if (!latestSession || session.lastActivity > latestSession.lastActivity) {
+        latestSession = session
+        latestSessionId = sid
+      }
+    }
+    
+    if (latestSession) {
+      return res.json({
+        messages: latestSession.messages,
+        sessionId: latestSessionId,
+        totalTokens: latestSession.messages.length * 50
+      })
+    }
+
+    res.json({
+      messages: [],
+      sessionId: null,
+      totalTokens: 0
+    })
+  } catch (error) {
+    console.error('Ошибка получения истории клиента:', error)
+    res.status(500).json({ error: 'Ошибка получения истории чата' })
+  }
+})
+
+// API для очистки истории чата клиента
+app.delete('/api/chat/client/:clientId/clear', (req, res) => {
+  try {
+    const { clientId } = req.params
+
+    if (clientChatSessions.has(clientId)) {
+      clientChatSessions.delete(clientId)
+    }
+
+    res.json({ success: true, message: 'История чата клиента очищена' })
+  } catch (error) {
+    console.error('Ошибка очистки истории клиента:', error)
     res.status(500).json({ error: 'Ошибка очистки истории чата' })
   }
 })
