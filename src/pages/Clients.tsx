@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { 
   Plus, 
   Search, 
@@ -11,13 +12,15 @@ import {
   Briefcase,
   Edit,
   Trash2,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react'
 import { Client } from '../types'
 import { useClients, useDeleteClient } from '../hooks/useClients'
 import { ClientForm } from '../components/ClientForm'
 
 export default function Clients() {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
@@ -121,7 +124,11 @@ export default function Clients() {
       {/* Clients Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredClients.map((client) => (
-          <div key={client.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
+          <div 
+            key={client.id} 
+            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => navigate(`/clients/${client.id}`)}
+          >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
@@ -138,17 +145,30 @@ export default function Clients() {
               </div>
               <div className="relative">
                 <button
-                  onClick={() => setShowDeleteMenu(showDeleteMenu === client.id ? null : client.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowDeleteMenu(showDeleteMenu === client.id ? null : client.id)
+                  }}
                   className="text-slate-400 hover:text-slate-600 transition-colors"
                   data-testid={`button-client-menu-${client.id}`}
                 >
                   <MoreVertical className="w-5 h-5" />
                 </button>
                 {showDeleteMenu === client.id && (
-                  <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                  <div 
+                    className="absolute right-0 top-8 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => navigate(`/clients/${client.id}`)}
+                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg flex items-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Подробнее
+                    </button>
                     <button
                       onClick={() => handleEditClient(client)}
-                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg flex items-center gap-2"
+                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                       data-testid={`button-edit-client-${client.id}`}
                     >
                       <Edit className="w-4 h-4" />
