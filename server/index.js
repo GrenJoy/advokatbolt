@@ -185,7 +185,7 @@ function getOrCreateSession(sessionId) {
 // API роут для AI чата с историей по сессиям
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, sessionId } = req.body
+    const { message, sessionId, context } = req.body
     
     if (!message || message.trim().length === 0) {
       return res.status(400).json({ error: 'Сообщение не может быть пустым' })
@@ -217,8 +217,12 @@ app.post('/api/chat', async (req, res) => {
     // Подготавливаем контекст для Gemini (последние 10 сообщений)
     const recentMessages = session.messages.slice(-10)
     
-    const prompt = `Ты - AI помощник для российского юриста. Отвечай кратко, профессионально и по делу на русском языке.
-    
+    const contextBlock = context
+      ? `\nКонтекст (важно учитывать при ответе):\n${typeof context === 'string' ? context : JSON.stringify(context, null, 2)}\n`
+      : ''
+
+    const prompt = `Ты - AI помощник для российского юриста. Отвечай кратко, профессионально и по делу на русском языке.${contextBlock}
+
 История разговора:
 ${recentMessages.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${msg.content}`).join('\n')}
 

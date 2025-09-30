@@ -83,6 +83,14 @@ export default function AIChat() {
     localStorage.getItem('chatSessionId')
   )
   const [totalTokens, setTotalTokens] = useState(0)
+  const [isContextOpen, setIsContextOpen] = useState(false)
+  const [systemPrompt, setSystemPrompt] = useState<string>(
+    'Ты - AI помощник для российского юриста. Отвечай кратко и по делу.'
+  )
+  const [includeClientInfo, setIncludeClientInfo] = useState<boolean>(false)
+  const [clientInfoText, setClientInfoText] = useState<string>('')
+  const [includeOCR, setIncludeOCR] = useState<boolean>(false)
+  const [ocrText, setOcrText] = useState<string>('')
 
   // Сохранение sessionId в localStorage
   useEffect(() => {
@@ -161,11 +169,26 @@ export default function AIChat() {
       timestamp: new Date().toLocaleString('ru-RU')
     }
 
-    setMessages(prev => [...prev, newMessage])
+    setMessages((prev: Message[]) => [...prev, newMessage])
     setInputMessage('')
     setIsLoading(true)
 
     try {
+      // Собираем контекст для запроса
+      const selectedContextSections: string[] = []
+      if (systemPrompt?.trim()) {
+        selectedContextSections.push(`Системный промпт:\n${systemPrompt.trim()}`)
+      }
+      if (includeClientInfo && clientInfoText.trim()) {
+        selectedContextSections.push(`Информация о клиенте:\n${clientInfoText.trim()}`)
+      }
+      if (includeOCR && ocrText.trim()) {
+        selectedContextSections.push(`OCR из вложений клиента:\n${ocrText.trim()}`)
+      }
+      const contextPayload = selectedContextSections.length > 0 
+        ? selectedContextSections.join('\n\n')
+        : undefined
+
       // Реальный запрос к Gemini API с sessionId
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -174,7 +197,8 @@ export default function AIChat() {
         },
         body: JSON.stringify({ 
           message: inputMessage.trim(),
-          sessionId: sessionId
+          sessionId: sessionId,
+          context: contextPayload
         }),
       })
 
@@ -198,7 +222,7 @@ export default function AIChat() {
         context: `Ответ от Gemini 2.5 Flash • Токенов: ${result.totalTokens}`
       }
       
-      setMessages(prev => [...prev, aiResponse])
+      setMessages((prev: Message[]) => [...prev, aiResponse])
       setTotalTokens(result.totalTokens)
     } catch (error) {
       console.error('Ошибка чата:', error)
@@ -209,7 +233,7 @@ export default function AIChat() {
         timestamp: new Date().toLocaleString('ru-RU'),
         context: 'Ошибка системы'
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages((prev: Message[]) => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
@@ -253,7 +277,7 @@ export default function AIChat() {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {messages.map((message) => (
+              {messages.map((message: Message) => (
               <div
                 key={message.id}
                 className={`flex gap-4 ${message.isUser ? 'justify-end' : 'justify-start'}`}
@@ -335,6 +359,59 @@ export default function AIChat() {
 
           {/* Input Area */}
           <div className="p-6 border-t border-slate-200">
+            {/* Context Controls */}
+            <div className="mb-4">
+              <button
+                onClick={() => setIsContextOpen(v => !v)}
+                className="text-sm text-slate-600 hover:text-slate-900 underline"
+              >
+                {isContextOpen ? 'Скрыть контекст' : 'Показать контекст'}
+              </button>
+              {isContextOpen && (
+                <div className="mt-3 space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Системный промпт</label>
+                    <textarea
+                      value={systemPrompt}
+                      onChange={(e) => setSystemPrompt(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                      <input type="checkbox" checked={includeClientInfo} onChange={(e) => setIncludeClientInfo(e.target.checked)} />
+                      Включить информацию о клиенте
+                    </label>
+                    {includeClientInfo && (
+                      <textarea
+                        value={clientInfoText}
+                        onChange={(e) => setClientInfoText(e.target.value)}
+                        rows={3}
+                        placeholder="Имя, email, особая информация..."
+                        className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                      <input type="checkbox" checked={includeOCR} onChange={(e) => setIncludeOCR(e.target.checked)} />
+                      Включить OCR из фото/документов
+                    </label>
+                    {includeOCR && (
+                      <textarea
+                        value={ocrText}
+                        onChange={(e) => setOcrText(e.target.value)}
+                        rows={3}
+                        placeholder="Вставьте OCR текст из фото, связанных с клиентом"
+                        className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
                 <Paperclip className="w-5 h-5" />
