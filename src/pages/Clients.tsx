@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { 
   Plus, 
   Search, 
@@ -11,13 +12,15 @@ import {
   Briefcase,
   Edit,
   Trash2,
-  Loader2
+  Loader2,
+  Eye
 } from 'lucide-react'
 import { Client } from '../types'
 import { useClients, useDeleteClient } from '../hooks/useClients'
 import { ClientForm } from '../components/ClientForm'
 
 export default function Clients() {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingClient, setEditingClient] = useState<Client | null>(null)
@@ -128,7 +131,11 @@ export default function Clients() {
                   <span className="text-white font-semibold text-sm">{getInitials(client.name)}</span>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900" data-testid={`text-client-name-${client.id}`}>
+                  <h3 
+                    className="font-semibold text-slate-900 hover:text-blue-600 cursor-pointer transition-colors" 
+                    data-testid={`text-client-name-${client.id}`}
+                    onClick={() => navigate(`/clients/${client.id}`)}
+                  >
                     {client.name}
                   </h3>
                   <p className="text-sm text-slate-600">
@@ -147,8 +154,16 @@ export default function Clients() {
                 {showDeleteMenu === client.id && (
                   <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[120px]">
                     <button
-                      onClick={() => handleEditClient(client)}
+                      onClick={() => navigate(`/clients/${client.id}`)}
                       className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg flex items-center gap-2"
+                      data-testid={`button-view-client-${client.id}`}
+                    >
+                      <Eye className="w-4 h-4" />
+                      Просмотр
+                    </button>
+                    <button
+                      onClick={() => handleEditClient(client)}
+                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
                       data-testid={`button-edit-client-${client.id}`}
                     >
                       <Edit className="w-4 h-4" />
