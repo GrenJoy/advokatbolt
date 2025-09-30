@@ -1,14 +1,30 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { documentsApi } from '../lib/api'
 import { processDocumentOCR } from '../lib/gemini'
+import { supabase } from '../lib/supabase'
 import type { CaseDocument } from '../types'
 
-// Получить документы дела
-export function useDocuments(caseId: string) {
+// Получить документы дела или клиента
+export function useDocuments(entityId: string, entityType: 'case' | 'client' = 'case') {
   return useQuery({
-    queryKey: ['/api/documents', caseId],
-    queryFn: () => documentsApi.getByCaseId(caseId),
-    enabled: !!caseId
+    queryKey: ['/api/documents', entityId, entityType],
+    queryFn: async () => {
+      if (entityType === 'case') {
+        return documentsApi.getByCaseId(entityId)
+      } else {
+        // Получаем документы клиента
+        const { data, error } = await supabase
+          .from('case_documents')
+          .select('*')
+          .eq('client_id', entityId)
+          .eq('entity_type', 'client')
+          .order('uploaded_at', { ascending: false })
+        
+        if (error) throw error
+        return data || []
+      }
+    },
+    enabled: !!entityId
   })
 }
 
