@@ -185,7 +185,7 @@ function getOrCreateSession(sessionId) {
 // API роут для AI чата с историей по сессиям
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, sessionId } = req.body
+    const { message, sessionId, context } = req.body
     
     if (!message || message.trim().length === 0) {
       return res.status(400).json({ error: 'Сообщение не может быть пустым' })
@@ -217,14 +217,20 @@ app.post('/api/chat', async (req, res) => {
     // Подготавливаем контекст для Gemini (последние 10 сообщений)
     const recentMessages = session.messages.slice(-10)
     
-    const prompt = `Ты - AI помощник для российского юриста. Отвечай кратко, профессионально и по делу на русском языке.
+    // Базовый промпт
+    let prompt = `Ты - AI помощник для российского юриста. Отвечай кратко, профессионально и по делу на русском языке.
     
 История разговора:
-${recentMessages.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${msg.content}`).join('\n')}
+${recentMessages.map(msg => `${msg.role === 'user' ? 'Пользователь' : 'Ассистент'}: ${msg.content}`).join('\n')}`
 
-Последний вопрос: ${message}
+    // Добавляем контекст если он предоставлен
+    if (context && context.trim()) {
+      prompt += `\n\nДОПОЛНИТЕЛЬНЫЙ КОНТЕКСТ:\n${context}\n`
+    }
 
-Ответь максимально полезно с учетом российского законодательства. Если нужна дополнительная информация, попроси её.`
+    prompt += `\nПоследний вопрос: ${message}
+
+Ответь максимально полезно с учетом российского законодательства и предоставленного контекста. Если нужна дополнительная информация, попроси её.`
 
     const result = await chatModel.generateContent(prompt)
     const response = await result.response
