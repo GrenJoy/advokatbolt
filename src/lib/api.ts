@@ -160,17 +160,31 @@ export const documentsApi = {
     return data || []
   },
 
+  // Получить документы клиента
+  async getByClientId(clientId: string): Promise<CaseDocument[]> {
+    const { data, error } = await supabase
+      .from('case_documents')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('entity_type', 'client')
+      .order('uploaded_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  },
+
   // Загрузить файл в Supabase Storage
-  async uploadFile(file: File, caseId: string): Promise<string> {
+  async uploadFile(file: File, entityId: string, entityType: 'case' | 'client' = 'case'): Promise<string> {
     const fileExt = file.name.split('.').pop()
-    const fileName = `${caseId}/${Date.now()}.${fileExt}`
+    const folder = entityType === 'client' ? 'client-documents' : 'case-documents'
+    const fileName = `${folder}/${entityId}/${Date.now()}.${fileExt}`
     
     const { data, error } = await supabase.storage
-      .from('case-documents')
+      .from('documents')
       .upload(fileName, file)
     
     if (error) throw error
-    return data.path
+    return fileName
   },
 
   // Создать запись о документе

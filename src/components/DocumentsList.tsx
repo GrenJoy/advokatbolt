@@ -17,11 +17,12 @@ import { supabase } from '../lib/supabase'
 import type { CaseDocument } from '../types'
 
 interface DocumentsListProps {
-  caseId: string
+  entityType: 'case' | 'client'
+  entityId: string
 }
 
-export function DocumentsList({ caseId }: DocumentsListProps) {
-  const { data: documents = [], isLoading, error } = useDocuments(caseId)
+export function DocumentsList({ entityType, entityId }: DocumentsListProps) {
+  const { data: documents = [], isLoading, error } = useDocuments(entityId, entityType)
   const deleteDocument = useDeleteDocument()
   const reprocessOCR = useReprocessOCR()
   const [showMenu, setShowMenu] = useState<string | null>(null)
@@ -54,7 +55,8 @@ export function DocumentsList({ caseId }: DocumentsListProps) {
         await deleteDocument.mutateAsync({
           documentId: document.id,
           filePath: document.file_path,
-          caseId
+          entityId,
+          entityType
         })
         setShowMenu(null)
       } catch (error) {

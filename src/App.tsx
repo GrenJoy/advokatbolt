@@ -6,6 +6,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Cases = lazy(() => import('./pages/Cases'))
 const CaseDetails = lazy(() => import('./pages/CaseDetails'))
 const Clients = lazy(() => import('./pages/Clients'))
+const ClientDetails = lazy(() => import('./pages/ClientDetails'))
 const Documents = lazy(() => import('./pages/Documents'))
 const AIChat = lazy(() => import('./pages/AIChat'))
 
@@ -19,6 +20,7 @@ function App() {
             <Route path="cases" element={<Cases />} />
             <Route path="cases/:id" element={<CaseDetails />} />
             <Route path="clients" element={<Clients />} />
+            <Route path="clients/:id" element={<ClientDetails />} />
             <Route path="documents" element={<Documents />} />
             <Route path="ai-chat" element={<AIChat />} />
             <Route path="calendar" element={<div className="p-6">Календарь в разработке</div>} />
